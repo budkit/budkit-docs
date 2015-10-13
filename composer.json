@@ -8,6 +8,7 @@
       "email": "livingstonefultang@gmail.com"
     }
   ],
+  "minimum-stability": "dev",
   "repositories": [
     {"type": "git", "url": "https://github.com/livingstonef/reflector.git"}
   ],
