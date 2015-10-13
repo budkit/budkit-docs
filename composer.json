@@ -1,0 +1,19 @@
+{
+  "name": "budkit/docs",
+  "description": "Generates beautiful PHP documentation",
+  "license": "GPLv3",
+  "authors": [
+    {
+      "name": "Livingstone Fultang",
+      "email": "livingstonefultang@gmail.com"
+    }
+  ],
+  "require": {
+    "php": ">=5.4.0",
+    "andrewsville/php-token-reflection" : "*",
+    "sami/sami": "*"
+  },
+  "autoload": {
+    "psr-4": { "Budkit\\Docs\\": "src/"}
+  }
+}
