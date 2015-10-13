@@ -3,7 +3,10 @@
 namespace Budkit\Docs;
 
 
-use TokenReflection\Broker;
+define('BUDKIT_DOCS_PATH', __DIR__);
+
+
+use Budkit\Docs\TokenReflection\Broker;
 
 /**
  * Created by PhpStorm.
@@ -16,8 +19,20 @@ class Documentor
 
     public $layout = null;
 
+    protected $broker;
 
     public $currentPath = [];
+
+    public $section = [
+//            "title"=>"",
+//            "namespace"=>"",
+//            "description"=>"",
+//            "uses"=>[],
+//            "constants"=>[],
+//            "methods"=>[],
+//            "functions"=>[],
+//            "literal"=>[],
+    ];
 
     /**
      * Parse and display the Pocco documentation for the given directory and
@@ -72,23 +87,14 @@ class Documentor
         $sections = [];
 
 
-        $broker = new Broker( new Broker\Backend\Memory());
+        $this->broker = $broker = new Broker(new Broker\Backend\Memory());
 
         //Reflection File
-        $rFile  = $broker->processString( $source, $directory.$file, true);
+        $rFile = $broker->processFile($directory . $file, true);
 
-        $section = [
-//            "title"=>"",
-//            "namespace"=>"",
-//            "description"=>"",
-//            "uses"=>[],
-//            "constants"=>[],
-//            "methods"=>[],
-//            "functions"=>[],
-//            "literal"=>[],
-        ];
+        $section = [];
 
-        foreach($rFile->getNamespaces() as $namespace){
+        foreach ($rFile->getNamespaces() as $namespace) {
 
             $ns_section = $section;
             $sections[] =& $ns_section;
@@ -100,7 +106,7 @@ class Documentor
 
             //Description
             //@TODO will need to parse this to extract params;
-            if(!empty($namespace->getDocComment())) {
+            if (!empty($namespace->getDocComment())) {
 
                 $ns_section["title"]["doc"]["annotations"] = $namespace->getAnnotations();
 
@@ -109,13 +115,21 @@ class Documentor
             }
 
             //Class Name
-           // print_R($namespace->getAnnotations());
+            // print_R($namespace->getAnnotations());
 
             //run throw classes;
             //start a new section for each class
             $classes = $namespace->getClasses();
-            if(!empty($classes)) {
+            if (!empty($classes)) {
                 foreach ($classes as $class) {
+
+
+                    //Nasty hack to help the broker find class dependencies;
+                    //In essence need to give it fully qualified namespaced class
+                    //$_class = $class->getName();
+                    //$class = $this->broker->getClass("\\".$_class, true);
+
+                    //print_r($__class);
 
                     $cls_section = $section;
                     $sections[] =& $cls_section;
@@ -131,7 +145,7 @@ class Documentor
                     if ($class->isInterface()) $labels["interface"] = "default";
                     if ($class->isInstantiable()) $labels["class"] = "primary";
                     if ($class->isTrait()) $labels["trait"] = "primary";
-                   // if (!$class->isCloneable()) $labels["not clonable"] = "black";
+                    // if (!$class->isCloneable()) $labels["not clonable"] = "black";
                     if ($class->isException()) $labels["exception"] = "error";
                     if ($class->isAbstract()) $labels["abstract"] = "warning";
 
@@ -140,143 +154,177 @@ class Documentor
 
 
                     //get parent classes
-                    $parents    = $class->getParentClassNameList();
-                    //$parentTree = [];
-                    if(!empty($parents)){
-                        $cls_section["description"]["doc"]["parents"] = $parents;
-                    }
-
-                    //get parent classes
                     $interfaces = $class->getInterfaces();
-
-                    if(!empty($interfaces)){
-
-                        $_interfaces = [];
-                        foreach ($interfaces as $interface){
-                            $_interfaces[] =  $interface->getName();
-                        }
-                        $cls_section["description"]["doc"]["interfaces"] = $_interfaces;
-                        //print_R($_parents);
-
-                        $_interfaces = [];
-
-                    }
+                    $this->processInterfaces($interfaces, $cls_section);
 
                     if (!empty($class->getDocComment())) {
-
                         $cls_section["description"]["doc"]["annotations"] = $class->getAnnotations();
-
-                        //print_R($method->getAnnotations());
-
-                        //$ns_section["title"]["doc"]["info"] = $namespace->getDocComment();
-
                     }
 
 
-                    //This class uses
-//                    $uses = $namespace->getNamespaceAliases();
-//                    if (!empty($uses)) {
-//                        foreach ($uses as $use) {
-//                            $cls_section["uses"]["code"] = "use " . $use . "\n";
-//                        }
-//                    }
-
-
-                    //Methods
-                    //$ownMethods = $class->getOwnMethods();
                     $methods = $class->getMethods();
+                    $toc = [];
+
+                    //$def_section["description"]["doc"]["type"] = $class->getName();
+                    $cls_section["description"]["doc"]["toc"] = ["title" => "Methods", "list" => &$toc];
+
 
                     if (!empty($methods)) {
-                       $toc = [];
-
-
-                        //$def_section["description"]["doc"]["type"] = $class->getName();
-                        $cls_section["description"]["doc"]["toc"] = ["title" => "Methods", "list"=> &$toc];
-
-                        //Inherited Methods Toc
-                        $itoc = [];
-                        $cls_section["inherited"]["doc"]["toc"]  = ["title" => "Inherited Methods", "list"=> &$itoc];
-
-
-                        foreach ($methods as $method) {
-
-                            if(!$class->hasOwnMethod($method->getShortName())){
-
-                                $i_mtd_id = "method:".$method->getShortName();
-                                $itoc[$i_mtd_id] = $method->getShortName();
-
-                                continue;
-                            }
-
-                            $mtd_id = "method:".$method->getShortName();
-                            $mtd_section = $section;
-                            $labels = [];
-
-                            $mtd_section["description"]["doc"]["type"] = "method";
-                            $mtd_section["description"]["doc"]["title"] = $method->getShortName();
-                            $mtd_section["description"]["doc"]["id"] = $mtd_id;
-
-                            //add the method name to the TOC
-                            //we don't want to show consructors, private or protected methods here;
-                            if(!$method->isProtected() && !$method->isPrivate() && $method->getShortName() !== "__construct") {
-                                $toc[$mtd_id] = $method->getShortName();
-                            }
-
-                            if ($method->isFinal()) $labels["final"] = "";
-                            if ($method->isPublic()) $labels["public"] = "success";
-                            if ($method->isStatic()) $labels["static"] = "default";
-
-                            if ($method->isProtected()) $labels["protected"] = "black";
-                            if ($method->isPrivate()) $labels["private"] = "error";
-                            if ($method->isAbstract()) $labels["abstract"] = "warning";
-
-                            $mtd_section["description"]["doc"]["labels"] = $labels;
-
-                            if (!empty($method->getDocComment())) {
-
-                                $mtd_section["description"]["doc"]["annotations"] = $method->getAnnotations();
-
-                                //print_R($method->getAnnotations());
-
-                                //$ns_section["title"]["doc"]["info"] = $namespace->getDocComment();
-
-                            }
-
-
-                            //$mtd_section["description"]["doc"]["body"] = $method->getDocComment();
-                            $mtd_section["description"]["code"] = str_ireplace($method->getDocComment(), "", $method->getSource());
-
-
-                            $sections[] = $mtd_section;
-                        }
+                        $this->processMethods($methods, $class, $sections, $toc);
                     }
-
 
 
                     //Constants
                     $constants = $class->getConstants();
-                    if (!empty($constants)){
-                        $def_section = $section;
+                    $this->processConstants($constants, $sections);
 
-                        //$labels = [];
 
-                        //print_R($constants); die;
+                    //get parent classes
+                    $parent = $class->getParentClass();
 
-                        //$def_section["description"]["doc"]["type"] = $class->getName();
-                        $def_section["description"]["doc"]["title"] = "Constants";
-                        $def_section["description"]["doc"]["annotations"] = $constants;
-                        $sections[] = $def_section;
+                    if (!empty($parent)) {
+                        //get a reflection of each parent;
+                        $this->processInheritance($parent, $sections, $cls_section);
                     }
+
+                    //If this class has no methods;
+                    if (empty($toc)) {
+                        unset($cls_section["description"]["doc"]["toc"]);
+                    }
+
+                    //If this class has no inherited methods;
+                    if (empty($itoc)) {
+                        unset($cls_section["inherited"]["doc"]["toc"]);
+                    }
+
 
                 }
             }
-
             //$sections[] = $section;
         }
 
         return $sections;
     }
 
+    public function processInterfaces($interfaces, &$cls_section)
+    {
+
+        if (!empty($interfaces)) {
+            $_interfaces = [];
+            foreach ($interfaces as $interface) {
+                $_interfaces[] = $interface->getName();
+            }
+            $cls_section["description"]["doc"]["interfaces"] = $_interfaces;
+            //print_R($_parents);
+            $_interfaces = [];
+        }
+    }
+
+    public function processConstants($constants, &$sections)
+    {
+
+        if (!empty($constants)) {
+            $def_section = $this->section;
+
+            $def_section["description"]["doc"]["title"] = "Constants";
+            $def_section["description"]["doc"]["annotations"] = $constants;
+
+            $sections[] = $def_section;
+        }
+    }
+
+    public function processMethods($methods, &$class, &$sections, &$toc, $showdoc = true)
+    {
+
+        foreach ($methods as $method) {
+
+            //We only want to deal with methods declared in this class;
+            if(!$class->hasOwnMethod($method->getName())) continue;
+
+            $mtd_id = "method:" . $method->getShortName();
+
+            //add the method name to the TOC
+            //we don't want to show consructors, private or protected methods here;
+            if (!$method->isProtected() && !$method->isPrivate() && $method->getShortName() !== "__construct") {
+                $toc[$mtd_id] = $method->getShortName();
+            }
+
+            //Do we want to show the complete doc?
+            if(!$showdoc) continue;
+
+            $mtd_section = $this->section;
+            $labels = [];
+
+            $mtd_section["description"]["doc"]["type"] = "method";
+            $mtd_section["description"]["doc"]["title"] = $method->getShortName();
+            $mtd_section["description"]["doc"]["id"] = $mtd_id;
+
+            if ($method->isFinal()) $labels["final"] = "";
+            if ($method->isPublic()) $labels["public"] = "success";
+            if ($method->isStatic()) $labels["static"] = "default";
+
+            if ($method->isProtected()) $labels["protected"] = "black";
+            if ($method->isPrivate()) $labels["private"] = "error";
+            if ($method->isAbstract()) $labels["abstract"] = "warning";
+
+            $mtd_section["description"]["doc"]["labels"] = $labels;
+
+            if (!empty($method->getDocComment())) {
+                $mtd_section["description"]["doc"]["annotations"] = $method->getAnnotations();
+            }
+
+            //$mtd_section["description"]["doc"]["body"] = $method->getDocComment();
+            $mtd_section["description"]["code"] = str_ireplace($method->getDocComment(), "", $method->getSource());
+
+            $sections[] = $mtd_section;
+
+        }
+
+    }
+
+    public function processInheritance($parent, &$sections, &$cls_section,  $itoc = [])
+    {
+        //$parentTree = [];
+        if (!empty($parent)) {
+
+
+            $cls_section["description"]["doc"]["parents"][] = $parent->getName();
+
+            $_toc = [];
+
+            $itd_section = $this->section;
+
+            $itd_section["description"]["doc"]["type"] = "inherits";
+            $itd_section["description"]["doc"]["title"] = $parent->getName();
+            $itd_section["description"]["doc"]["toc"] = ["title" => "Inherited Methods", "list" => &$_toc];
+
+
+            $methods = $parent->getMethods();
+
+           print_r($parent);
+
+
+
+            if(!empty($methods)) {
+                $this->processMethods($methods, $parent, $sections, $_toc, false);
+            }
+
+           // print_r($_toc);
+
+            if (!empty($_toc)) {
+                $sections[] = $itd_section;
+            }
+
+            $parents_parent = $parent->getParentClass();
+
+            if(!empty($parents_parent)){
+
+                //Loop through all the parents parents, until no more parents
+                $this->processInheritance($parents_parent, $sections, $cls_section, $itoc);
+
+            }
+        }
+    }
 
     /**
      * Parse docblock parameters extracted from the end of the docblock
@@ -429,45 +477,46 @@ class Documentor
     }
 
 
-    function listTree($array = [], $file){
+    function listTree($array = [], $file)
+    {
 
         $level = 1;
         $ol = "<ol class='tree'>";
 
-        foreach($array as $key=>$value){
+        foreach ($array as $key => $value) {
 
-            if(!is_array($value)){
+            if (!is_array($value)) {
 
                 $this->currentPath[] = $value;
 
-                $li  = '<li class="file">';
-                $li .= '<a href="?file='.rawurlencode($value).'">'.$key.'</a>';
+                $li = '<li class="file">';
+                $li .= '<a href="?file=' . rawurlencode($value) . '">' . $key . '</a>';
                 $li .= '</li>';
 
                 //$path   = "";
                 array_pop($this->currentPath);
 
-                $ol   .= $li;
+                $ol .= $li;
 
-            }else{
+            } else {
                 //$path .= "/".$key;
                 $this->currentPath[] = $key;
 
                 $currentPath = implode("/", $this->currentPath);
 
-                $checked = (strpos($file, $currentPath) !== false ) ? true : false;
-                $li  = '<li>';
-                $li .= '<label for="'.$key.'">'.$key.'</label>';
-                $li .= '<input type="checkbox"'.(($checked)?'checked="checked"' : null ).'id="'.$key.'">';
-                $li .= $this->listTree( $value , $file);
+                $checked = (strpos($file, $currentPath) !== false) ? true : false;
+                $li = '<li>';
+                $li .= '<label for="' . $key . '">' . $key . '</label>';
+                $li .= '<input type="checkbox"' . (($checked) ? 'checked="checked"' : null) . 'id="' . $key . '">';
+                $li .= $this->listTree($value, $file);
                 $li .= '</li>';
-                $ol   .= $li;
+                $ol .= $li;
 
                 array_pop($this->currentPath);
                 //$path .= "/".$value;
             }
 
-            $level ++;
+            $level++;
 
         }
         $ol .= "</ol>";
@@ -527,7 +576,8 @@ class Documentor
     }
 
 
-    public function parseDown($text){
+    public function parseDown($text)
+    {
 
         return \Parsedown::instance()->text($text);
     }

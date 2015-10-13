@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <title><?php print basename($file, '.php'); ?></title>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
-    <link href="vendor/budkit/locco/src/assets/kube.css" type="text/css" rel="stylesheet"/>
-    <link rel="stylesheet" href="vendor/budkit/locco/src/assets/highlight/styles/railscasts.css">
+    <link href="../../../budkit/docs/src/assets/kube.css" type="text/css" rel="stylesheet"/>
+    <link rel="stylesheet" href="../../../budkit/docs/src/assets/highlight/styles/railscasts.css">
 
-    <link href="vendor/budkit/locco/src/assets/styles.css" type="text/css" rel="stylesheet"/>
+    <link href="../../../budkit/docs/src/assets/styles.css" type="text/css" rel="stylesheet"/>
 
-    <script src="vendor/budkit/locco/src/assets/highlight/highlight.pack.js"></script>
+    <script src="../../../budkit/docs/src/assets/highlight/highlight.pack.js"></script>
     <script>hljs.initHighlightingOnLoad();</script>
 </head>
 <body>
@@ -60,19 +60,25 @@
 
                                     </h1>
                                     <?php if (isset($fragment["doc"]["parents"])) : ?>
-                                        <p><span class="label label-default" outline>Extends</span>
+                                        <p>
                                             <?php foreach ($fragment["doc"]["parents"] as $p=>$parent) : ?>
-                                                <a href="?file=<?php print(str_ireplace("\\", "/", $parent) ) ?>.php"><span class="small"><?php print($parent); ?></span></a>
+                                                <span class="label label-default" outline>Extends</span>
+                                                    <a href="?file=<?php print(str_ireplace("\\", "/", $parent) ) ?>.php"><span class="small"><?php print($parent); ?></span></a>
+                                               <br />
                                             <?php  endforeach ?>
                                         </p>
                                         <?php endif; ?>
 
                                     <?php if (isset($fragment["doc"]["interfaces"])) : ?>
-                                        <p><span class="label label-default" outline>Implements</span>
-                                            <?php foreach ($fragment["doc"]["interfaces"] as $interface) : ?>
+                                        <p>
+
+                                       <?php foreach ($fragment["doc"]["interfaces"] as $interface) : ?>
+                                            <span class="label label-default" outline>Implements</span>
                                                 <a href="?file=<?php print(str_ireplace("\\", "/", $interface) ) ?>.php"><span class="small"><?php print($interface); ?></span></a>
-                                            <?php  endforeach ?>
+                                            <br />
+                                        <?php  endforeach ?>
                                         </p>
+
                                     <?php endif; ?>
 
                                 <?php endif; ?>
