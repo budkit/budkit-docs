@@ -11,7 +11,7 @@
   "require": {
     "php": ">=5.4.0",
     "andrewsville/php-token-reflection" : "*",
-    "sami/sami": "*"
+    "erusev/parsedown": "*"
   },
   "autoload": {
     "psr-4": { "Budkit\\Docs\\": "src/"}
