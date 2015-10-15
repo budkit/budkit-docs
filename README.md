@@ -12,13 +12,20 @@ This package builds on the work by [xeoncross/pocco](http://github.com/xeoncross
 
 ## Example
 
+- The Budkit framework reference uses this library  [budkit/framework API](http://budkit.github.io/budkit-framework/Budkit/Application/Instance.php.html)
+
+## Usage
+
 First you need to install the library using [Composer](http://getcomposer.org/doc/00-intro.md#globally). Create a `composer.json` file in your documentation folder and type this:
 
 	{
+	    "minimum-stability": "dev",
 	    "repositories":[
+	       {"type": "git", "url": "https://github.com/livingstone/livingstone/reflector.git"},
 	       {"type": "git", "url": "https://github.com/budkit/budkit-docs.git"},
 	    ]
 		"require": {
+		    "livingstone/reflector":"*",
 			"budkit/docs": "dev-master"
 		}
 	}
@@ -64,5 +71,3 @@ Next, create an index.php file in the directory where you intend to create/save 
 
 
 And that's it. Visit `/path/to/docs/index.php` to begin reading. If you will like to save static html output. use `/path/to/docs/index.php?save=true`. Make sure that the process running this script can write to the parent directory of the source files. e.g. if documenting `/framework/src` make sure it can read/write into `/framework` to create `/framework/docs`
-
-The Budkit framework reference uses this library  [budkit/framework API](http://budkit.github.io/budkit-framework/Budkit/Application/Instance.php.html)
