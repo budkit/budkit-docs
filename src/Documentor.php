@@ -7,6 +7,7 @@ define('BUDKIT_DOCS_PATH', __DIR__);
 
 
 use TokenReflection\Broker;
+use TokenReflection\ReflectionBase;
 
 /**
  * Created by PhpStorm.
@@ -110,9 +111,19 @@ class Documentor
             $fnc_section["description"]["doc"]["type"] = "Function";
             $fnc_section["description"]["doc"]["labels"] = $labels;
             $fnc_section["description"]["doc"]["title"] = $function->getShortName();
-            $fnc_section["description"]["doc"]["annotations"] = $function->getAnnotations();
 
+
+            $fnc_section["description"]["doc"]["annotations"] = $this->getTrimmedAnnotations( $function );
             $fnc_section["description"]["code"] = str_ireplace($function->getDocComment(), "", $function->getSource());
+
+            //Proces the function parameters
+            $params = $function->getParameters();
+            if(!empty($params)){
+                if(isset($fnc_section["description"]["doc"]["annotations"]["param"])){
+                    unset($fnc_section["description"]["doc"]["annotations"]["param"]);
+                }
+                $this->processParams($params, $fnc_section);
+            }
 
             $sections[] = $fnc_section;
         }
@@ -146,7 +157,7 @@ class Documentor
             //@TODO will need to parse this to extract params;
             if (!empty($namespace->getDocComment())) {
 
-                $ns_section["title"]["doc"]["annotations"] = $namespace->getAnnotations();
+                $ns_section["title"]["doc"]["annotations"] =  $this->getTrimmedAnnotations( $namespace );
 
                 //$ns_section["title"]["doc"]["info"] = $namespace->getDocComment();
 
@@ -155,7 +166,7 @@ class Documentor
                 //We are probably in a non namespaced file, if we have to do this
 
                 $ns_section["title"]["doc"]["subject"] = substr($rFile->getName(), strlen($directory));
-                $ns_section["title"]["doc"]["annotations"] = $rFile->getAnnotations();
+                $ns_section["title"]["doc"]["annotations"] =  $this->getTrimmedAnnotations( $rFile );
 
             }
 
@@ -209,7 +220,7 @@ class Documentor
                     $this->processInterfaces($interfaces, $cls_section);
 
                     if (!empty($class->getDocComment())) {
-                        $cls_section["description"]["doc"]["annotations"] = $class->getAnnotations();
+                        $cls_section["description"]["doc"]["annotations"] =  $this->getTrimmedAnnotations( $class );
                     }
 
 
@@ -313,6 +324,18 @@ class Documentor
         }
     }
 
+    protected function getTrimmedAnnotations(ReflectionBase $object){
+
+        //@BUG For some reason long_description and short_description have whitespace in the character keys
+        $annotations  = [];
+        foreach($object->getAnnotations() as $_id=>$_value) {
+            //echo $directory;
+            $annotations[trim($_id)] = $_value;
+        };
+
+        return $annotations;
+    }
+
     public function processMethods($methods, &$class, &$sections, &$toc, $file, $showdoc = true)
     {
 
@@ -356,7 +379,18 @@ class Documentor
             $mtd_section["description"]["doc"]["labels"] = $labels;
 
             if (!empty($method->getDocComment())) {
-                $mtd_section["description"]["doc"]["annotations"] = $method->getAnnotations();
+                $mtd_section["description"]["doc"]["annotations"] =  $this->getTrimmedAnnotations( $method );
+            }
+
+            //the param annotation in getAnnotations from the doc block does not capture all params
+            //this is because if multiple @params are declared in the doc block, the annotation is
+            //overwritten by using the same 'param' key. we now need to use $method->getParams() to fix this
+            $params = $method->getParameters();
+            if(!empty($params)){
+                if(isset($mtd_section["description"]["doc"]["annotations"]["param"])){
+                    unset($mtd_section["description"]["doc"]["annotations"]["param"]);
+                }
+                $this->processParams($params, $mtd_section);
             }
 
             //$mtd_section["description"]["doc"]["body"] = $method->getDocComment();
@@ -368,6 +402,53 @@ class Documentor
 
     }
 
+
+    public function processParams($params, &$mtd_section){
+
+        $_params = [];
+
+        foreach($params as $param) {
+
+            $_plabels = [];
+
+            $_annotation = [
+                "name" => $param->getName(),
+                "type" => $param->getOriginalTypeHint(),
+                "labels" => [],
+                "default"=>$param->getDefaultValueDefinition()
+            ];
+
+            $_nsalias = $param->getNamespaceAliases();
+            if(!empty($_nsalias) && isset($_nsalias[$_annotation["type"]])){
+                $_annotation["type"] = $_nsalias[$_annotation["type"]];
+            }
+
+
+            if($param->isOptional() && $param->isDefaultValueAvailable()) $_plabels["optional"] = "default";
+            if($param->isArray()){
+                $_plabels["array"] = "primary";
+            }
+
+            if(empty($_annotation["type"])){
+                $_annotation["type"] = "mixed";
+            }
+
+            if($param->isCallable()) $_plabels["callable"] = "success";
+            if($param->isPassedByReference()) $_plabels["referable"] = "warning";
+            if($param->allowsNull()) $_plabels["nullable"] = "black";
+
+
+            $_annotation["labels"] = $_plabels; //reset plabels
+
+            $_params[] = $_annotation;
+
+
+        }
+
+        $mtd_section["description"]["doc"]["params"] = $_params;
+        //print_R($param->getDocblockTemplates());
+
+    }
 
     public function processProperties($properties, &$class, &$sections, &$toc, $file, $showdoc = true)
     {
@@ -413,7 +494,7 @@ class Documentor
             $pty_section["description"]["doc"]["labels"] = $labels;
 
             if (!empty($property->getDocComment())) {
-                $pty_section["description"]["doc"]["annotations"] = $property->getAnnotations();
+                $pty_section["description"]["doc"]["annotations"] =  $this->getTrimmedAnnotations( $property );
             }
 
             //$mtd_section["description"]["doc"]["body"] = $method->getDocComment();

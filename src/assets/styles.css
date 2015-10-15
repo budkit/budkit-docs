@@ -346,7 +346,7 @@ Orginal Style from ethanschoonover.com/solarized (c) Jeremy Hull <sourdrums@gmai
 .literal {
     width: 100%;
     position: relative;
-    border-bottom: 1px solid rgba(134, 134, 134, 0.08);
+    border-bottom: 10px solid rgba(134, 134, 134, 0.08);
     overflow: hidden;
 }
 

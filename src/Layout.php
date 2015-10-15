@@ -120,11 +120,53 @@
 
                                         <?php endif; ?>
 
+                                        <!--Short Description-->
+                                        <?php if (isset($fragment["doc"]["annotations"]["short_description"])) : ?>
+                                            <p><?php print($this->parseDown($fragment["doc"]["annotations"]["short_description"])); ?></p>
+                                        <?php endif; ?>
+
+                                        <!-- Long Description -->
+                                        <?php if (isset($fragment["doc"]["annotations"]["long_description"])) : ?>
+                                            <p><?php print($this->parseDown($fragment["doc"]["annotations"]["long_description"])); ?></p>
+                                        <?php endif; ?>
+
+                                        <?php if (isset($fragment["doc"]["params"])) : $params = $fragment["doc"]["params"]; ?>
+
+                                        <table>
+                                            <thead>
+                                            <tr>
+                                                <td class="width-1">Parameter</td>
+                                                <td class="width-2">Type</td>
+                                                <td class="width-1">Default</td>
+                                                <td class="width-8">Attributes</td>
+                                            </tr>
+                                            </thead>
+                                            <tbody>
+                                            <?php foreach ($params as $k => $param) : ?>
+                                                    <tr>
+                                                        <td>
+                                                            <strong>$<?php print($param["name"]); ?></strong>
+                                                        </td>
+                                                        <td><?php print($param["type"]); ?> </td>
+                                                        <td><?php print($param["default"]); ?> </td>
+                                                        <td>
+                                                            <?php foreach($param["labels"] as $_p=>$_plabel) : ?>
+                                                                <span class="label label-<?php print($_plabel); ?>" outline><?php print($_p); ?></span>
+                                                            <?php endforeach; ?>
+                                                        </td>
+                                                    </tr>
+                                            <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                        <?php endif; ?>
+
+
+
                                         <?php if (isset($fragment["doc"]["annotations"])) : $annotations = $fragment["doc"]["annotations"]; ?>
                                             <?php foreach ($annotations as $k => $annotation) : ?>
                                                 <?php if (!in_array(trim($k), ["short_description", "long_description"])) { ?>
                                                     <dl>
-                                                        <dt><?php print(ucfirst($k)); ?></dt>
+                                                        <dt><i><?php print(ucfirst($k)); ?></i></dt>
                                                         <?php if (is_array($annotation)) { ?>
                                                             <dd><?php print($this->parseDown(reset($annotation))); ?></dd>
                                                         <?php } else { ?>
@@ -132,9 +174,8 @@
                                                         <?php } ?>
 
                                                     </dl>
-                                                <?php } else { ?>
-                                                    <p><?php print($this->parseDown($annotation)); ?></p>
-                                                <?php } ?>
+                                                <?php }  ?>
+
                                             <?php endforeach; ?>
 
                                         <?php endif; ?>
