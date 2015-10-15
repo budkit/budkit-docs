@@ -2,13 +2,13 @@ budkit/docs
 =====
 
 The PHP documentation generator that uses your existing source code! Based on the awesome [Docco](http://jashkenas.github.com/docco/) Javascript documentation generator (but with improvements for PHP!).
-This package builds on the work [xeoncross/pocco](http://github.com/xeoncross/pocco) . Differences between this and the former, is the use of a fork of a much more complete Token Reflection library to process source files. See [livingstone/reflector](http://github.com/livingstone/reflector)
+This package builds on the work by [xeoncross/pocco](http://github.com/xeoncross/pocco) . Differences between this and the former, is the use of a much more complete Token Reflection library (See [livingstone/reflector](http://github.com/livingstone/reflector)) to process source files, and [erusev/parsedown](http://github.com/erusev/parsedown) to process annotations. This means you can have add markdown to your PHP source code docblocks
 
 ##Dependencies
 
 - php >= 5.4.0
 - [livingstone/reflector](http://github.com/livingstonef/reflector) : "*"
-- "erusev/parsedown": "*"
+- erusev/parsedown : "*"
 
 ## Example
 
@@ -28,7 +28,7 @@ After you have created a composer.json file you can install budkit/docs.
 
 	$ composer install
 
-Next, create an index.php file in the directory in which you will like to create the docs e.g in your package docs folder.
+Next, create an index.php file in the directory where you intend to create/save the docs e.g in your package 'docs' folder.
 
 	<?php
 
@@ -40,7 +40,8 @@ Next, create an index.php file in the directory in which you will like to create
         die("404 - To see these docs you need to have the budkit/docs dependency installed");
     }
 
-    //Tell the documentor where your source files are stored
+    //Tell the documentor where your source files to document are stored
+    //CHANGE THIS TO YOUR SOURCE FOLDER!!!
     $dir = realpath('../src') . '/';
 
     $default_file_to_show = null;
@@ -62,6 +63,6 @@ Next, create an index.php file in the directory in which you will like to create
     }
 
 
-And that's it. If you will like to save static html output. use `/path/to/docs/index.php?save=true`. Make sure that the process running this script can write to the parent directory of the source files. e.g. if documenting `/framework/src` make sure it can read/write into `/framework` to create `/framework/docs`
+And that's it. Visit `/path/to/docs/index.php` to begin reading. If you will like to save static html output. use `/path/to/docs/index.php?save=true`. Make sure that the process running this script can write to the parent directory of the source files. e.g. if documenting `/framework/src` make sure it can read/write into `/framework` to create `/framework/docs`
 
 The Budkit framework reference uses this library  [budkit/framework API](http://budkit.github.io/budkit-framework/Budkit/Application/Instance.php.html)
