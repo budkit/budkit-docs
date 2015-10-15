@@ -25,7 +25,11 @@ class Documentor
 
     public $saveMode = false;
 
+    public $isIndex = false;
+
     public $savePath = "/";
+
+    public $saveHierarchy = "";
 
     public $section = [
 //            "title"=>"",
@@ -320,7 +324,7 @@ class Documentor
             $mtd_id = "method:" . $method->getShortName();
 
             $link = (!$class->hasOwnMethod($method->getName()) || !$showdoc)
-                ? (($this->saveMode) ?   $this->savePath."/".$file.".html"  : "?file=" . $file  ). "#" . $mtd_id
+                ? (($this->saveMode) ?   $this->saveHierarchy.$file.".html"  : "?file=" . $file  ). "#" . $mtd_id
                 : "#" . $mtd_id;
 
             //add the method name to the TOC
@@ -376,7 +380,7 @@ class Documentor
             $pty_id = "property:" . $property->getName();
 
             $link = (!$class->hasOwnProperty($property->getName()) || !$showdoc)
-                ? (($this->saveMode) ?   $this->savePath."/".$file.".html"  : "?file=" . $file ). "#" . $pty_id
+                ? (($this->saveMode) ?   $this->saveHierarchy.$file.".html"  : "?file=" . $file ). "#" . $pty_id
                 : "#" . $pty_id;
 
             //add the method name to the TOC
@@ -692,14 +696,31 @@ class Documentor
         foreach ($files as $file) {
 
 
+            //Wee need this to fix links
+            if(!$this->isIndex) {
+
+                $_segments = explode("/", $file);
+                $_levels = count($_segments);
+
+                //if not saving index
+
+                for ($_i = 0; $_i < $_levels - 1; $_i++) {
+                    $this->saveHierarchy .= "../";
+                }
+            }
+
             //$source = file_get_contents($directory . $file);
             $sections = $this->parseSource($rDir[$directory . $file], $file, $directory);
 
             $this->renderSave($sections, $file, $files, dirname($directory) . "/docs");
 
+            //reset this heierarchy
+            $this->saveHierarchy = "";
+
         }
 
         //create the index file which should be the first in files;
+        $this->isIndex = true;
         $this->renderSave(
             //get the first files sections
             $this->parseSource($rDir[$directory . $files[0]], $files[0], $directory),
@@ -779,6 +800,7 @@ class Documentor
         $tree = $this->explodeTree($namespaced, "/", true);
 
 
+
         if (!$this->layout) {
             $this->layout = __DIR__ . '/Layout.php';
         }
@@ -828,7 +850,7 @@ class Documentor
 
                 $this->currentPath[] = $value;
                 $link = (!$this->saveMode)? rawurlencode($value) : $value;
-                $href = ($this->saveMode) ?  $this->savePath."/".$link.".html"  : "?file=" . $link;
+                $href = ($this->saveMode) ? $this->saveHierarchy . $link.".html"  : "?file=" . $link;
                 $li = '<li class="file">';
                 $li .= '<a href="'.$href.'">' . $key . '</a>';
                 $li .= '</li>';

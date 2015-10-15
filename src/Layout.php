@@ -5,12 +5,18 @@
     <title><?php print basename($file, '.php'); ?></title>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
 
-    <?php if ($this->saveMode) { ?>
+    <?php
 
-    <link href="<?php print($this->savePath) ?>/assets/kube.css" type="text/css" rel="stylesheet"/>
-    <link href="<?php print($this->savePath) ?>/assets/highlight/styles/railscasts.css" rel="stylesheet">
-    <link href="<?php print($this->savePath) ?>/assets/styles.css" type="text/css" rel="stylesheet"/>
-        <script src="<?php print($this->savePath) ?>/assets/highlight/highlight.pack.js"></script>
+
+        if ($this->saveMode) {
+
+
+            ?>
+
+    <link href="<?php print($this->saveHierarchy) ?>assets/kube.css" type="text/css" rel="stylesheet"/>
+    <link href="<?php print($this->saveHierarchy) ?>assets/highlight/styles/railscasts.css" rel="stylesheet">
+    <link href="<?php print($this->saveHierarchy) ?>assets/styles.css" type="text/css" rel="stylesheet"/>
+        <script src="<?php print($this->saveHierarchy) ?>assets/highlight/highlight.pack.js"></script>
 
     <?php } else { ?>
 
@@ -78,7 +84,7 @@
 
                                             <?php foreach ($fragment["doc"]["parents"] as $p => $parent) : ?>
                                                 <span class="label label-default" outline>Extends</span>
-                                                <a href="<?php print((($this->saveMode) ?$this->savePath . "/" : "?file=") . str_ireplace("\\", "/", $parent)) . (($this->saveMode) ? ".php.html" : ".php") ?>"><span
+                                                <a href="<?php print((($this->saveMode) ? $this->saveHierarchy : "?file=") . str_ireplace("\\", "/", $parent)) . (($this->saveMode) ? ".php.html" : ".php") ?>"><span
                                                         class="small"><?php print($parent); ?></span></a>
                                                 <br/>
                                             <?php endforeach ?>
@@ -90,7 +96,7 @@
 
                                             <?php foreach ($fragment["doc"]["traits"] as $t => $trait) : ?>
                                                 <span class="label label-default" outline>Uses</span>
-                                                <a href="<?php print((($this->saveMode) ?$this->savePath . "/" : "?file=") . str_ireplace("\\", "/", $trait)) . (($this->saveMode) ? ".php.html" : ".php") ?>"><span
+                                                <a href="<?php print((($this->saveMode) ? $this->saveHierarchy : "?file=") . str_ireplace("\\", "/", $trait)) . (($this->saveMode) ? ".php.html" : ".php") ?>"><span
                                                         class="small"><?php print($trait); ?></span></a>
                                                 <br/>
                                             <?php endforeach ?>
@@ -101,7 +107,7 @@
 
                                             <?php foreach ($fragment["doc"]["interfaces"] as $interface) : ?>
                                                 <span class="label label-default" outline>Implements</span>
-                                                <a href="<?php print((($this->saveMode) ?$this->savePath . "/" : "?file=") . str_ireplace("\\", "/", $interface)) . (($this->saveMode) ? ".php.html" : ".php") ?>"><span
+                                                <a href="<?php print((($this->saveMode) ? $this->saveHierarchy : "?file=") . str_ireplace("\\", "/", $interface)) . (($this->saveMode) ? ".php.html" : ".php") ?>"><span
                                                         class="small"><?php print($interface); ?></span></a>
                                                 <br/>
                                             <?php endforeach ?>
