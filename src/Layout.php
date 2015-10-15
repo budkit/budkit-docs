@@ -4,12 +4,24 @@
     <meta charset="UTF-8">
     <title><?php print basename($file, '.php'); ?></title>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
+
+    <?php if ($this->saveMode) { ?>
+
+    <link href="<?php print($this->savePath) ?>/assets/kube.css" type="text/css" rel="stylesheet"/>
+    <link href="<?php print($this->savePath) ?>/assets/highlight/styles/railscasts.css" rel="stylesheet">
+    <link href="<?php print($this->savePath) ?>/assets/styles.css" type="text/css" rel="stylesheet"/>
+        <script src="<?php print($this->savePath) ?>/assets/highlight/highlight.pack.js"></script>
+
+    <?php } else { ?>
+
     <link href="../../../budkit/docs/src/assets/kube.css" type="text/css" rel="stylesheet"/>
     <link rel="stylesheet" href="../../../budkit/docs/src/assets/highlight/styles/railscasts.css">
-
     <link href="../../../budkit/docs/src/assets/styles.css" type="text/css" rel="stylesheet"/>
+        <script src="../../../budkit/docs/src/assets/highlight/highlight.pack.js"></script>
 
-    <script src="../../../budkit/docs/src/assets/highlight/highlight.pack.js"></script>
+    <?php } ?>
+
+
     <script>hljs.initHighlightingOnLoad();</script>
 </head>
 <body>
@@ -26,13 +38,13 @@
         <?php foreach ($partials as $partial => $fragment) : ?>
 
             <?php //echo $partial; print_r($fragment); ?>
-            <?php $depth ++; ?>
+            <?php $depth++; ?>
             <?php if (empty($fragment["doc"]) && empty($fragment["code"])) continue ?>
 
-            <?php switch ((string)$partial) : default :  ?>
+            <?php switch ((string)$partial) : default : ?>
                 <div class="literal column">
                     <div class="codedoc">
-                        <?php if($depth > 3 ) : ?>
+                        <?php if ($depth > 3) : ?>
                             <a class="to-top" href="">Back To Top</a>
                         <?php endif; ?>
                         <?php if (isset($fragment["doc"])) : ?>
@@ -46,57 +58,75 @@
                                     <h1 id="<?php print($fragment["doc"]["id"]); ?>">
 
                                         <?php if (isset($fragment["doc"]["type"])) : ?>
-                                            <span class="label label-primary"><?php print($fragment["doc"]["type"]); ?></span>
+                                            <span
+                                                class="label label-primary"><?php print($fragment["doc"]["type"]); ?></span>
                                         <?php endif; ?>
 
                                         <?php if (isset($fragment["doc"]["labels"]) && !empty($fragment["doc"]["labels"])) : ?>
-                                                <?php foreach ($fragment["doc"]["labels"] as $label=>$class) : ?>
-                                                    <span class="label label-<?php print($class); ?>" <?php print(empty($class)?"outline":""); ?>><?php print($label); ?></span>
-                                                <?php  endforeach ?>
+                                            <?php foreach ($fragment["doc"]["labels"] as $label => $class) : ?>
+                                                <span
+                                                    class="label label-<?php print($class); ?>" <?php print(empty($class) ? "outline" : ""); ?>><?php print($label); ?></span>
+                                            <?php endforeach ?>
                                         <?php endif; ?>
 
                                         <?php print($fragment["doc"]["title"]); ?>
 
 
                                     </h1>
-                                    <?php if (isset($fragment["doc"]["parents"])) : ?>
-                                        <p>
-                                            <?php foreach ($fragment["doc"]["parents"] as $p=>$parent) : ?>
+                                    <p>
+                                        <?php if (isset($fragment["doc"]["parents"])) : ?>
+
+                                            <?php foreach ($fragment["doc"]["parents"] as $p => $parent) : ?>
                                                 <span class="label label-default" outline>Extends</span>
-                                                    <a href="?file=<?php print(str_ireplace("\\", "/", $parent) ) ?>.php"><span class="small"><?php print($parent); ?></span></a>
-                                               <br />
-                                            <?php  endforeach ?>
-                                        </p>
+                                                <a href="<?php print((($this->saveMode) ?$this->savePath . "/" : "?file=") . str_ireplace("\\", "/", $parent)) . (($this->saveMode) ? ".php.html" : ".php") ?>"><span
+                                                        class="small"><?php print($parent); ?></span></a>
+                                                <br/>
+                                            <?php endforeach ?>
+
                                         <?php endif; ?>
 
-                                    <?php if (isset($fragment["doc"]["interfaces"])) : ?>
-                                        <p>
 
-                                       <?php foreach ($fragment["doc"]["interfaces"] as $interface) : ?>
-                                            <span class="label label-default" outline>Implements</span>
-                                                <a href="?file=<?php print(str_ireplace("\\", "/", $interface) ) ?>.php"><span class="small"><?php print($interface); ?></span></a>
-                                            <br />
-                                        <?php  endforeach ?>
-                                        </p>
+                                        <?php if (isset($fragment["doc"]["traits"])) : ?>
 
-                                    <?php endif; ?>
+                                            <?php foreach ($fragment["doc"]["traits"] as $t => $trait) : ?>
+                                                <span class="label label-default" outline>Uses</span>
+                                                <a href="<?php print((($this->saveMode) ?$this->savePath . "/" : "?file=") . str_ireplace("\\", "/", $trait)) . (($this->saveMode) ? ".php.html" : ".php") ?>"><span
+                                                        class="small"><?php print($trait); ?></span></a>
+                                                <br/>
+                                            <?php endforeach ?>
+
+                                        <?php endif; ?>
+
+                                        <?php if (isset($fragment["doc"]["interfaces"])) : ?>
+
+                                            <?php foreach ($fragment["doc"]["interfaces"] as $interface) : ?>
+                                                <span class="label label-default" outline>Implements</span>
+                                                <a href="<?php print((($this->saveMode) ?$this->savePath . "/" : "?file=") . str_ireplace("\\", "/", $interface)) . (($this->saveMode) ? ".php.html" : ".php") ?>"><span
+                                                        class="small"><?php print($interface); ?></span></a>
+                                                <br/>
+                                            <?php endforeach ?>
+
+
+                                        <?php endif; ?>
+                                    </p>
+
 
                                 <?php endif; ?>
 
                                 <?php if (isset($fragment["doc"]["annotations"])) : $annotations = $fragment["doc"]["annotations"]; ?>
-                                    <?php foreach($annotations as $k=>$annotation) : ?>
-                                        <?php if( !in_array(trim($k), ["short_description","long_description"])) { ?>
-                                        <dl>
-                                            <dt><?php print(ucfirst( $k ) ); ?></dt>
-                                            <?php if (is_array($annotation) ){ ?>
-                                                <dd><?php print($this->parseDown( reset($annotation) ) ); ?></dd>
-                                            <?php }else{ ?>
-                                               <dd><?php print( $this->parseDown($annotation) ); ?></dd>
-                                            <?php } ?>
+                                    <?php foreach ($annotations as $k => $annotation) : ?>
+                                        <?php if (!in_array(trim($k), ["short_description", "long_description"])) { ?>
+                                            <dl>
+                                                <dt><?php print(ucfirst($k)); ?></dt>
+                                                <?php if (is_array($annotation)) { ?>
+                                                    <dd><?php print($this->parseDown(reset($annotation))); ?></dd>
+                                                <?php } else { ?>
+                                                    <dd><?php print($this->parseDown($annotation)); ?></dd>
+                                                <?php } ?>
 
-                                        </dl>
-                                        <?php }else{ ?>
-                                            <p><?php print( $this->parseDown( $annotation) ); ?></p>
+                                            </dl>
+                                        <?php } else { ?>
+                                            <p><?php print($this->parseDown($annotation)); ?></p>
                                         <?php } ?>
                                     <?php endforeach; ?>
 
@@ -111,12 +141,15 @@
                                         <dd>
                                             <?php $level = 0; ?>
                                             <row>
-                                                <?php foreach($toc["list"] as $toc_id=>$toc_title): ?>
-                                                    <?php if ($level % 2 == 0 ): ?>
-                                                        </row><row>
-                                                        <?php endif; ?>
-                                                        <column cols="6"><a href="#<?php print($toc_id) ?>"><?php print($toc_title) ?>()</a></column>
-                                                    <?php $level++ ?>
+                                                <?php foreach ($toc["list"] as $toc_id => $toc_link): ?>
+                                                <?php if ($level % 2 == 0): ?>
+                                            </row>
+                                            <row>
+                                                <?php endif; ?>
+                                                <column cols="6"><a
+                                                        href="<?php print($toc_link["link"]) ?>"><?php print($toc_link["title"]) ?> </a>
+                                                </column>
+                                                <?php $level++ ?>
                                                 <?php endforeach; ?>
                                             </row>
                                         </dd>

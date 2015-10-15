@@ -6,7 +6,7 @@ namespace Budkit\Docs;
 define('BUDKIT_DOCS_PATH', __DIR__);
 
 
-use Budkit\Docs\TokenReflection\Broker;
+use TokenReflection\Broker;
 
 /**
  * Created by PhpStorm.
@@ -22,6 +22,10 @@ class Documentor
     protected $broker;
 
     public $currentPath = [];
+
+    public $saveMode = false;
+
+    public $savePath = "/";
 
     public $section = [
 //            "title"=>"",
@@ -45,7 +49,21 @@ class Documentor
      */
     public function display($directory, $default = NULL, $requested = NULL)
     {
-        list($files, $files_array) = $this->getAllPHPFiles($directory);
+
+        $this->broker = $broker = new Broker(new Broker\Backend\Memory());
+        //Reflection File
+        $rDir = $broker->processDirectory($directory, "*.php", true);
+
+        $files = array_keys($rDir);
+
+        array_walk($files, function (&$value, $key) use ($directory) {
+            //echo $directory;
+            $value = substr($value, strlen($directory));
+        });
+
+        //print_r($files);
+
+        //list($files, $files_array) = $this->getAllPHPFiles($directory);
 
         if ($requested) {
 
@@ -65,14 +83,37 @@ class Documentor
 
         }
 
-        $source = file_get_contents($directory . $file);
-        $sections = $this->parseSource($source, $directory, $file);
+        //$source = file_get_contents($directory . $file);
+        $sections = $this->parseSource($rDir[$directory . $file], $file, $directory);
 
-        $this->render($sections, $file, $files, $files_array);
+        $this->render($sections, $file, $files);
 
         return true;
     }
 
+
+    public function processFunctions($functions, &$sections)
+    {
+
+        foreach ($functions as $function) {
+
+            $fnc_section = $this->section;
+
+            $labels = [];
+
+            if ($function->isDisabled()) $labels["disabled"] = "error";
+
+            $fnc_section["description"]["doc"]["type"] = "Function";
+            $fnc_section["description"]["doc"]["labels"] = $labels;
+            $fnc_section["description"]["doc"]["title"] = $function->getShortName();
+            $fnc_section["description"]["doc"]["annotations"] = $function->getAnnotations();
+
+            $fnc_section["description"]["code"] = str_ireplace($function->getDocComment(), "", $function->getSource());
+
+            $sections[] = $fnc_section;
+        }
+
+    }
 
     /**
      * Parse the source code of a file into an array of documentation (comments)
@@ -81,17 +122,10 @@ class Documentor
      * @param string $source
      * @return array
      */
-    public function parseSource($source, $directory, $file)
+    public function parseSource($rFile, $file, $directory)
     {
         $namespace = null;
         $sections = [];
-
-
-        $this->broker = $broker = new Broker(new Broker\Backend\Memory());
-
-        //Reflection File
-        $rFile = $broker->processFile($directory . $file, true);
-
         $section = [];
 
         foreach ($rFile->getNamespaces() as $namespace) {
@@ -112,6 +146,19 @@ class Documentor
 
                 //$ns_section["title"]["doc"]["info"] = $namespace->getDocComment();
 
+            } else if (!empty($rFile->getDocComment())) {
+
+                //We are probably in a non namespaced file, if we have to do this
+
+                $ns_section["title"]["doc"]["subject"] = substr($rFile->getName(), strlen($directory));
+                $ns_section["title"]["doc"]["annotations"] = $rFile->getAnnotations();
+
+            }
+
+            //File Functions
+            $functions = $namespace->getFunctions();
+            if (!empty($functions)) {
+                $this->processFunctions($functions, $sections);
             }
 
             //Class Name
@@ -162,15 +209,45 @@ class Documentor
                     }
 
 
-                    $methods = $class->getMethods();
                     $toc = [];
 
                     //$def_section["description"]["doc"]["type"] = $class->getName();
                     $cls_section["description"]["doc"]["toc"] = ["title" => "Methods", "list" => &$toc];
 
 
+                    $ptoc = [];
+
+                    //$def_section["description"]["doc"]["type"] = $class->getName();
+                    $cls_section["properties"]["doc"]["toc"] = ["title" => "Properties", "list" => &$ptoc];
+
+                    //Properties
+                    $properties = $class->getProperties();
+                    if (!empty($properties)) {
+                        $this->processProperties($properties, $class, $sections, $ptoc, $file);
+                    }
+
+
+                    $methods = $class->getMethods();
                     if (!empty($methods)) {
-                        $this->processMethods($methods, $class, $sections, $toc);
+                        $this->processMethods($methods, $class, $sections, $toc, $file);
+                    }
+
+                    //get parent classes
+                    $parent = $class->getParentClass();
+
+                    if (!empty($parent)) {
+
+                        // print_r($directory); print("<br />");
+                        //print_R($file);
+                        //get a reflection of each parent;
+                        $this->processInheritance($parent, $sections, $cls_section, $file, $directory);
+                    }
+
+                    //Traits
+                    $traits = $class->getTraits();
+
+                    if (!empty($traits)) {
+                        $this->processTraits($traits, $sections, $cls_section, $file, $directory);
                     }
 
 
@@ -178,14 +255,11 @@ class Documentor
                     $constants = $class->getConstants();
                     $this->processConstants($constants, $sections);
 
-
-                    //get parent classes
-                    $parent = $class->getParentClass();
-
-                    if (!empty($parent)) {
-                        //get a reflection of each parent;
-                        $this->processInheritance($parent, $sections, $cls_section);
+                    //If no properties;
+                    if (empty($ptoc)) {
+                        unset($cls_section["properties"]["doc"]["toc"]);
                     }
+
 
                     //If this class has no methods;
                     if (empty($toc)) {
@@ -212,6 +286,8 @@ class Documentor
         if (!empty($interfaces)) {
             $_interfaces = [];
             foreach ($interfaces as $interface) {
+
+                if ($interface->isInternal()) continue;
                 $_interfaces[] = $interface->getName();
             }
             $cls_section["description"]["doc"]["interfaces"] = $_interfaces;
@@ -233,24 +309,28 @@ class Documentor
         }
     }
 
-    public function processMethods($methods, &$class, &$sections, &$toc, $showdoc = true)
+    public function processMethods($methods, &$class, &$sections, &$toc, $file, $showdoc = true)
     {
 
         foreach ($methods as $method) {
 
             //We only want to deal with methods declared in this class;
-            if(!$class->hasOwnMethod($method->getName())) continue;
+            if (!$class->hasOwnMethod($method->getName()) || $method->isPrivate()) continue;
 
             $mtd_id = "method:" . $method->getShortName();
+
+            $link = (!$class->hasOwnMethod($method->getName()) || !$showdoc)
+                ? (($this->saveMode) ?   $this->savePath."/".$file.".html"  : "?file=" . $file  ). "#" . $mtd_id
+                : "#" . $mtd_id;
 
             //add the method name to the TOC
             //we don't want to show consructors, private or protected methods here;
             if (!$method->isProtected() && !$method->isPrivate() && $method->getShortName() !== "__construct") {
-                $toc[$mtd_id] = $method->getShortName();
+                $toc[$mtd_id] = ["title" => $method->getShortName() . "()", "link" => $link];
             }
 
             //Do we want to show the complete doc?
-            if(!$showdoc) continue;
+            if (!$showdoc) continue;
 
             $mtd_section = $this->section;
             $labels = [];
@@ -264,8 +344,10 @@ class Documentor
             if ($method->isStatic()) $labels["static"] = "default";
 
             if ($method->isProtected()) $labels["protected"] = "black";
-            if ($method->isPrivate()) $labels["private"] = "error";
+            //if ($method->isPrivate()) $labels["private"] = "error";
             if ($method->isAbstract()) $labels["abstract"] = "warning";
+
+            if ($method->isDeprecated()) $labels["deprecated"] = "error";
 
             $mtd_section["description"]["doc"]["labels"] = $labels;
 
@@ -282,49 +364,152 @@ class Documentor
 
     }
 
-    public function processInheritance($parent, &$sections, &$cls_section,  $itoc = [])
+
+    public function processProperties($properties, &$class, &$sections, &$toc, $file, $showdoc = true)
+    {
+        foreach ($properties as $property) {
+
+            //We only want to deal with methods declared in this class;
+            if (!$class->hasOwnProperty($property->getName())) continue;
+            if ($property->isPrivate() || $property->isProtected()) continue;
+
+            $pty_id = "property:" . $property->getName();
+
+            $link = (!$class->hasOwnProperty($property->getName()) || !$showdoc)
+                ? (($this->saveMode) ?   $this->savePath."/".$file.".html"  : "?file=" . $file ). "#" . $pty_id
+                : "#" . $pty_id;
+
+            //add the method name to the TOC
+            //we don't want to show consructors, private or protected methods here;
+
+            $toc[$pty_id] = ["title" => $property->getName(), "link" => $link];
+
+            //Do we want to show the complete doc?
+            if (!$showdoc) continue;
+
+            $pty_section = $this->section;
+            $labels = [];
+
+
+            $pty_section["description"]["doc"]["type"] = "property";
+            $pty_section["description"]["doc"]["title"] = $property->getName();
+            $pty_section["description"]["doc"]["id"] = $pty_id;
+
+            //if ($property->isFinal()) $labels["final"] = "";
+            if ($property->isStatic()) $labels["static"] = "default";
+            if ($property->isPublic()) $labels["public"] = "success";
+
+            if ($property->isProtected()) $labels["protected"] = "black";
+            //if ($property->isPrivate()) $labels["private"] = "error";
+
+            //if ($property->isAbstract()) $labels["abstract"] = "warning";
+
+            if ($property->isDeprecated()) $labels["deprecated"] = "error";
+
+            $pty_section["description"]["doc"]["labels"] = $labels;
+
+            if (!empty($property->getDocComment())) {
+                $pty_section["description"]["doc"]["annotations"] = $property->getAnnotations();
+            }
+
+            //$mtd_section["description"]["doc"]["body"] = $method->getDocComment();
+            $pty_section["description"]["code"] = str_ireplace($property->getDocComment(), "", $property->getSource());
+
+            $sections[] = $pty_section;
+
+        }
+
+    }
+
+    public function processInheritance($parent, &$sections, &$cls_section, $file, $directory, $itoc = [])
     {
         //$parentTree = [];
         if (!empty($parent)) {
 
-
             $cls_section["description"]["doc"]["parents"][] = $parent->getName();
 
             $_toc = [];
+            $_ptoc = [];
+
+            $file = substr($parent->getFileName(), strlen($directory));
 
             $itd_section = $this->section;
+            $itd_section["description"]["doc"]["toc"] = ["title" => "Inherited Methods from {$parent->getName()}", "list" => &$_toc];
 
-            $itd_section["description"]["doc"]["type"] = "inherits";
-            $itd_section["description"]["doc"]["title"] = $parent->getName();
-            $itd_section["description"]["doc"]["toc"] = ["title" => "Inherited Methods", "list" => &$_toc];
 
+            $itd_section["properties"]["doc"]["toc"] = ["title" => "Inherited Properties from {$parent->getName()}", "list" => &$_ptoc];
 
             $methods = $parent->getMethods();
-
-           print_r($parent);
-
-
-
-            if(!empty($methods)) {
-                $this->processMethods($methods, $parent, $sections, $_toc, false);
+            if (!empty($methods)) {
+                $this->processMethods($methods, $parent, $sections, $_toc, $file, false);
             }
 
-           // print_r($_toc);
+            $properties = $parent->getProperties();
+            if (!empty($properties)) {
+                $this->processProperties($properties, $parent, $sections, $_ptoc, $file, false);
+
+                if (empty($_ptoc)) {
+                    unset($itd_section["properties"]);
+                }
+            }
 
             if (!empty($_toc)) {
                 $sections[] = $itd_section;
             }
 
+
             $parents_parent = $parent->getParentClass();
 
-            if(!empty($parents_parent)){
+            if (!empty($parents_parent)) {
 
                 //Loop through all the parents parents, until no more parents
-                $this->processInheritance($parents_parent, $sections, $cls_section, $itoc);
+                $this->processInheritance($parents_parent, $sections, $cls_section, $file, $directory, $itoc);
 
             }
         }
     }
+
+
+    public function processTraits($traits, &$sections, &$cls_section, $file, $directory, $itoc = [])
+    {
+        if (!empty($traits)) {
+
+            foreach ($traits as $parent) {
+
+                $file = substr($parent->getFileName(), strlen($directory));
+
+                $cls_section["description"]["doc"]["traits"][] = $parent->getName();
+
+                $_toc = [];
+                $_ptoc = [];
+
+                $itd_section = $this->section;
+                $itd_section["description"]["doc"]["toc"] = ["title" => "Inherited Methods from {$parent->getName()}", "list" => &$_toc];
+
+
+                $itd_section["properties"]["doc"]["toc"] = ["title" => "Inherited Properties from {$parent->getName()}", "list" => &$_ptoc];
+
+                $methods = $parent->getMethods();
+                if (!empty($methods)) {
+                    $this->processMethods($methods, $parent, $sections, $_toc, $file, false);
+                }
+
+                $properties = $parent->getProperties();
+                if (!empty($properties)) {
+                    $this->processProperties($properties, $parent, $sections, $_ptoc, $file, false);
+
+                    if (empty($_ptoc)) {
+                        unset($itd_section["properties"]);
+                    }
+                }
+
+                if (!empty($_toc)) {
+                    $sections[] = $itd_section;
+                }
+            }
+        }
+    }
+
 
     /**
      * Parse docblock parameters extracted from the end of the docblock
@@ -452,7 +637,7 @@ class Documentor
      * @param array $files the array of other project files
      * @return void
      */
-    public function render($sections, $file, $files, $files_array)
+    public function render($sections, $file, $files)
     {
         //sort files into namespaces
         $namespaced = [];
@@ -468,12 +653,166 @@ class Documentor
          */
         //print_r($tree);
 
-
         if (!$this->layout) {
             $this->layout = __DIR__ . '/Layout.php';
         }
 
         require($this->layout);
+
+    }
+
+
+    /**
+     * Parse and display the Pocco documentation for the given directory and
+     * all contained PHP files. You may also specify the default file to show
+     * if none has been requested.
+     *
+     * @param string $directory
+     * @param string $file
+     * @return boolean
+     */
+    public function saveHTML($directory, $default = NULL, $requested = NULL)
+    {
+
+        $this->broker = $broker = new Broker(new Broker\Backend\Memory());
+        //Reflection File
+        $rDir = $broker->processDirectory($directory, "*.php", true);
+
+        $files = array_keys($rDir);
+
+        array_walk($files, function (&$value, $key) use ($directory) {
+            //echo $directory;
+            $value = substr($value, strlen($directory));
+        });
+
+        //sort files into namespaces
+        $this->saveMode = true;
+        $this->savePath = dirname($directory) . "/docs";
+
+        foreach ($files as $file) {
+
+
+            //$source = file_get_contents($directory . $file);
+            $sections = $this->parseSource($rDir[$directory . $file], $file, $directory);
+
+            $this->renderSave($sections, $file, $files, dirname($directory) . "/docs");
+
+        }
+
+        //create the index file which should be the first in files;
+        $this->renderSave(
+            //get the first files sections
+            $this->parseSource($rDir[$directory . $files[0]], $files[0], $directory),
+            $file, $files, $this->savePath, "index.html"
+
+        );
+
+        //copy assets into docs directory;
+        $this->xcopy(BUDKIT_DOCS_PATH."/assets", $this->savePath."/assets", 0777);
+
+
+        return true;
+    }
+
+
+    /**
+     * Copy a file, or recursively copy a folder and its contents
+     * @author      Aidan Lister <aidan@php.net>
+     * @version     1.0.1
+     * @link        http://aidanlister.com/2004/04/recursively-copying-directories-in-php/
+     * @param       string   $source    Source path
+     * @param       string   $dest      Destination path
+     * @param       string   $permissions New folder creation permissions
+     * @return      bool     Returns true on success, false on failure
+     */
+    public function xcopy($source, $dest, $permissions = 0755)
+    {
+        // Check for symlinks
+        if (is_link($source)) {
+            return symlink(readlink($source), $dest);
+        }
+
+        // Simple copy for a file
+        if (is_file($source)) {
+            return copy($source, $dest);
+        }
+
+        // Make destination directory
+        if (!is_dir($dest)) {
+            mkdir($dest, $permissions);
+        }
+
+        // Loop through the folder
+        $dir = dir($source);
+        while (false !== $entry = $dir->read()) {
+            // Skip pointers
+            if ($entry == '.' || $entry == '..') {
+                continue;
+            }
+
+            // Deep copy directories
+            $this->xcopy("$source/$entry", "$dest/$entry", $permissions);
+        }
+
+        // Clean up
+        $dir->close();
+        return true;
+    }
+
+    /**
+     * Render the documentation HTML for the given sections and files
+     *
+     * @param array $sections from parsed PHP file
+     * @param string $file the filename
+     * @param array $files the array of other project files
+     * @return void
+     */
+    private function renderSave($sections, $file, $files, $savePath, $saveAs = null)
+    {
+
+        $namespaced = [];
+
+        foreach ($files as $key => $namespace) {
+            $namespaced[$namespace] = $namespace;
+        }
+
+        $tree = $this->explodeTree($namespaced, "/", true);
+
+
+        if (!$this->layout) {
+            $this->layout = __DIR__ . '/Layout.php';
+        }
+
+        ob_start();
+
+        require($this->layout);
+
+        $page = ob_get_contents();
+        ob_end_clean();
+
+        $saveFile = $savePath . "/" . $file . ".html";
+        $dirname = dirname($saveFile);
+
+        if (!is_dir($dirname)) {
+            if (mkdir($dirname, 0777, true)) {
+
+            } else {
+                echo "Error: Could not create {$saveFile}" . "<br />";
+                return;
+            }
+        }
+
+        //Save the file;
+
+        $savedFile = (!$saveAs) ? $saveFile : $savePath . "/" . $saveAs;
+        $fw = fopen($savedFile, "w");
+        fputs($fw, $page, strlen($page));
+        fclose($fw);
+
+        @chmod($savedFile, 0777);
+
+        return true;
+
     }
 
 
@@ -488,9 +827,10 @@ class Documentor
             if (!is_array($value)) {
 
                 $this->currentPath[] = $value;
-
+                $link = (!$this->saveMode)? rawurlencode($value) : $value;
+                $href = ($this->saveMode) ?  $this->savePath."/".$link.".html"  : "?file=" . $link;
                 $li = '<li class="file">';
-                $li .= '<a href="?file=' . rawurlencode($value) . '">' . $key . '</a>';
+                $li .= '<a href="'.$href.'">' . $key . '</a>';
                 $li .= '</li>';
 
                 //$path   = "";
@@ -539,7 +879,7 @@ class Documentor
      *
      * @return array
      */
-    function explodeTree($array, $delimiter = '_', $baseval = false)
+    function explodeTree($array, $delimiter = '_', $baseval = false, $callback = null)
     {
         if (!is_array($array)) return false;
         $splitRE = '/' . preg_quote($delimiter, '/') . '/';
@@ -553,6 +893,7 @@ class Documentor
             // Might be slow for really deep and large structures
             $parentArr = &$returnArr;
             foreach ($parts as $part) {
+
                 if (!isset($parentArr[$part])) {
                     $parentArr[$part] = array();
                 } elseif (!is_array($parentArr[$part])) {
@@ -562,7 +903,14 @@ class Documentor
                         $parentArr[$part] = array();
                     }
                 }
+
                 $parentArr = &$parentArr[$part];
+
+                //Use a callback to do more stuff!
+                if (!empty($callback) && is_callable($callback)) {
+                    $callback($leafPart, $parentArr, $part, $val);
+                }
+
             }
 
             // Add the final part to the structure
